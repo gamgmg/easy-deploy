@@ -5,7 +5,7 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "postbuild2": "yarn deploy",
+    "postbuild": "yarn deploy",
     "deploy": "node ./deploy/deploy.js",
     "lint": "vue-cli-service lint"
   },

@@ -6,6 +6,7 @@ const ssh = new node_ssh();
 const srcPath = path.resolve(__dirname, '../dist');
 const configs = require('./config');
 const StreamZip = require('node-stream-zip');
+const config = require('./config');
 
 console.log('开始压缩dist目录...');
 startZip();
@@ -28,9 +29,9 @@ function startZip() {
       }
       console.log('已生成zip包');
       // console.log('开始上传dist.zip至远程机器...');
-      // uploadFile();
+      uploadFile();
 
-      moveToServer()
+      // moveToServer()
     });
 
   archive.pipe(output);//典型的node流用法
@@ -89,14 +90,22 @@ function uploadFile() {
   ssh.connect({ //configs存放的是连接远程机器的信息
     host: configs.host,
     username: configs.user,
-    password: configs.password,
+    password: configs.passward,
     port: 22 //SSH连接默认在22端口
   }).then(function () {
+    console.log('ssh连接成功')
     //上传网站的发布包至configs中配置的远程服务器的指定地址
-    ssh.putFile(__dirname + '/dist.zip', configs.path).then(function (status) {
+    ssh.putFile(__dirname + '/dist.zip', configs.zipFilePath).then(async function (status) {
       console.log('上传文件成功');
       console.log('开始执行远端脚本');
-      startRemoteShell();//上传成功后触发远端脚本
+      console.log('删除dist文件夹')
+      await startRemoteShell('rm -rf dist', configs.cwdPath) // 删除dist文件夹
+      console.log('解压dist.zip')
+      await startRemoteShell('unzip dist.zip', configs.cwdPath);// 解压dist.zip
+      console.log('删除dist.zip')
+      await startRemoteShell('rm -f dist.zip', configs.cwdPath) // 删除dist.zip
+      console.log('部署完成')
+      process.exit(0)
     }).catch(err => {
       console.log('文件传输异常:', err);
       process.exit(0);
@@ -108,16 +117,19 @@ function uploadFile() {
 }
 
 //执行远端部署脚本
-function startRemoteShell() {
-  //在服务器上cwd配置的路径下执行sh deploy.sh脚本来实现发布
-  ssh.execCommand('sh deploy.sh', { cwd: '/usr/bin/XXXXX' }).then(function (result) {
-    console.log('远程STDOUT输出: ' + result.stdout)
-    console.log('远程STDERR输出: ' + result.stderr)
-    if (!result.stderr) {
-      console.log('发布成功!');
-      process.exit(0);
-    }
-  });
+function startRemoteShell(sell, path) {
+  return new Promise(resolve => {
+    ssh.execCommand(sell, { cwd: path }).then(function (result) {
+      // console.log('远程STDOUT输出: ' + result.stdout)
+      // console.log('远程STDERR输出: ' + result.stderr)
+      if (!result.stderr) {
+        resolve()
+      } else {
+        console.log('操作失败', result.stderr)
+        process.exit(0);
+      }
+    });
+  })
 }
 
 
